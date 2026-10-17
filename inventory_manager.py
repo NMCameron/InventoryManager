@@ -53,7 +53,7 @@ def save_inventory(inventory, INVENTORY_FILE):
     with open(INVENTORY_FILE, "w") as file:
         for item in inventory:
             file.write(
-                f"{item["name"]} | {item["category"]} | {item["quantity"]}\n"
+                f"{item["name"]}|{item["category"]}|{item["quantity"]}\n"
                 )
 
 
@@ -197,7 +197,7 @@ def search_inventory(inventory):
     print("Search Results:")
 
     for index, item in enumerate(matches, start=1):
-        print(f"{index}. {item['name']} | {item['category']} | Quantity: {item['quantity']}")
+        print(f"{index}. {item['name']}|{item['category']}|Quantity:{item['quantity']}")
 
 
 
