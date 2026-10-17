@@ -71,6 +71,7 @@ def view_inventory(inventory):
 
 
 def add_item(inventory):
+    """Add an item to the inventory list"""
     while True:
         name = input("Enter the item name: ").strip()
 
@@ -114,7 +115,7 @@ def add_item(inventory):
 
 
 def update_quantity(inventory):
-
+    """Changes the quantity of an existing item"""
     if not inventory:
         print("No inventory items found.")
         return
@@ -148,7 +149,7 @@ def update_quantity(inventory):
 
 
 def remove_item(inventory):
-
+    """Removes an item from the inventory list"""
     if not inventory:
         print("No inventory items found.")
         return
@@ -176,11 +177,32 @@ def remove_item(inventory):
 
 
 def search_inventory(inventory):
-    print("Search Inventory")
+    """Searches inventory using case insensitive search"""
+    search = input("Enter item name to search: ").strip()
+
+    if not search:
+        print("Error: Search cannot be empty.")
+        return
+
+    matches = []
+
+    for item in inventory:
+        if search.lower() in item["name"].lower():
+            matches.append(item)
+
+    if not matches:
+        print("No inventory items matched your search.")
+        return
+
+    print("Search Results:")
+
+    for index, item in enumerate(matches, start=1):
+        print(f"{index}. {item['name']} | {item['category']} | Quantity: {item['quantity']}")
 
 
 
 def display_summary(inventory):
+    """Displays unique items, total quantity of all items, low-stock items (<5), and number of items in each category."""
     unique_items = len(inventory)
     total_quantity = 0
     low_stock = 0
@@ -212,7 +234,6 @@ def display_summary(inventory):
 
 
 def main():
-    #TODO set up main function, that controls everything
     inventory = load_inventory(INVENTORY_FILE)
 
     while True:        
