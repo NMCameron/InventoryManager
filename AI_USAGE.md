@@ -1,1 +1,1 @@
-Directory issue where VS Code was only running E:\Code\ and searching for inventory.txt there when it was located in ...\InventoryManager\
+AI was used to assist with directory issue where VS Code was only running E:\Code\ and searching for inventory.txt there when it was located in E:\Code\InventoryManager\
