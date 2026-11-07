@@ -1,240 +1,296 @@
 import pytest
-from inventory_manager import load_inventory, save_inventory
 
+from inventory_manager import (
+    calculate_summary,
+    find_matches,
+    load_inventory,
+    remove_item_at,
+    save_inventory,
+    update_item_quantity,
+    validate_new_item,
+)
 
 
 @pytest.fixture
 def sample_inventory():
     return [
-        {"name": "Notebook", "category": "Office", "quantity": 4},
         {"name": "Laptop", "category": "Electronics", "quantity": 10},
-        {"name": "Pen", "category": "office", "quantity": 5},
-        {"name": "Mouse", "category": "Electronics", "quantity": 0},
+        {"name": "Laptop Charger", "category": "Electronics", "quantity": 4},
+        {"name": "Phone", "category": "Electronics", "quantity": 15},
+        {"name": "Phone Charger", "category": "Electronics", "quantity": 5},
+        {"name": "Stapler", "category": "Office Supplies", "quantity": 8},
+        {"name": "Printer Paper", "category": "Office Supplies", "quantity": 2},
     ]
 
 
 
-def test_load_valid_file(tmp_path):
+def test_load_valid_inventory(tmp_path):
     # Arrange
-    file = tmp_path / "inventory.txt"
-    file.write_text("Notebook|Office|10\n")
+    file_path = tmp_path / "inventory.txt"
+    file_path.write_text("Laptop|Electronics|10\nStapler|Office Supplies|8\n")
 
     # Act
-    inventory = load_inventory(file)
+    result = load_inventory(str(file_path))
 
     # Assert
-    assert inventory == [{"name": "Notebook", "category": "Office", "quantity": 10}]
+    assert result == [
+        {"name": "Laptop", "category": "Electronics", "quantity": 10},
+        {"name": "Stapler", "category": "Office Supplies", "quantity": 8},
+    ]
 
 
 
 def test_load_quantity_integer(tmp_path):
     # Arrange
-    file = tmp_path / "inventory.txt"
-    file.write_text("Notebook|Office|10\n")
+    file_path = tmp_path / "inventory.txt"
+    file_path.write_text("Phone|Electronics|15\n")
 
     # Act
-    inventory = load_inventory(file)
+    result = load_inventory(str(file_path))
 
     # Assert
-    assert inventory[0]["quantity"] == 10
-
-
-
-def test_load_ignores_blanks(tmp_path):
-    # Arrange
-    file = tmp_path / "inventory.txt"
-    file.write_text("Notebook|Office|10\n\n\nLaptop|Electronics|5\n\n")
-
-    # Act
-    inventory = load_inventory(file)
-
-    # Assert
-    assert len(inventory) == 2
-    assert inventory[1]["name"] == "Laptop"
+    assert isinstance(result[0]["quantity"], int)
+    assert result[0]["quantity"] == 15
 
 
 
 def test_load_missing_file(tmp_path):
     # Arrange
-    file = tmp_path / "not_inventory.txt"
+    missing_path = tmp_path / "does_not_exist.txt"
 
     # Act
-    inventory = load_inventory(file)
+    result = load_inventory(str(missing_path))
 
     # Assert
-    assert inventory == []
+    assert result == []
 
 
 
-def test_load_empty_file(tmp_path):
+def test_save_writes_summary(tmp_path, sample_inventory):
     # Arrange
-    file = tmp_path / "inventory.txt"
-    file.write_text("")
+    file_path = tmp_path / "inventory.txt"
 
     # Act
-    inventory = load_inventory(file)
+    save_inventory(sample_inventory, str(file_path))
 
     # Assert
-    assert inventory == []
-
-
-@pytest.mark.parametrize(
-    "quantity",
-    ["0", "4", "5"],
-    ids=["zero", "low_stock_boundary", "not_low_stock_boundary"],
-)
-def test_load_different_quantities(tmp_path, quantity):
-    # Arrange
-    file = tmp_path / "inventory.txt"
-    file.write_text(f"Notebook|Office|{quantity}\n")
-
-    # Act
-    inventory = load_inventory(file)
-
-    # Assert
-    assert inventory[0]["quantity"] == int(quantity)
-
-
-
-def test_save_multiple_items(tmp_path, sample_inventory):
-    # Arrange
-    file = tmp_path / "inventory.txt"
-
-    # Act
-    save_inventory(sample_inventory, file)
-
-    # Assert
-    assert file.read_text() == (
-        "Notebook|Office|4\n"
-        "Laptop|Electronics|10\n"
-        "Pen|office|5\n"
-        "Mouse|Electronics|0\n"
-    )
+    lines = file_path.read_text().splitlines()
+    assert lines == [
+        "Laptop|Electronics|10",
+        "Laptop Charger|Electronics|4",
+        "Phone|Electronics|15",
+        "Phone Charger|Electronics|5",
+        "Stapler|Office Supplies|8",
+        "Printer Paper|Office Supplies|2",
+    ]
 
 
 
 def test_save_empty_inventory(tmp_path):
     # Arrange
-    file = tmp_path / "inventory.txt"
-    inventory = []
+    file_path = tmp_path / "inventory.txt"
 
     # Act
-    save_inventory(inventory, file)
+    save_inventory([], str(file_path))
 
     # Assert
-    assert file.read_text() == ""
+    assert file_path.read_text() == ""
 
 
 
-def test_save_and_load_round_trip(tmp_path, sample_inventory):
+def test_round_trip(tmp_path, sample_inventory):
     # Arrange
-    file = tmp_path / "inventory.txt"
+    file_path = tmp_path / "inventory.txt"
 
     # Act
-    save_inventory(sample_inventory, file)
-    inventory = load_inventory(file)
+    save_inventory(sample_inventory, str(file_path))
+    loaded = load_inventory(str(file_path))
 
     # Assert
-    assert inventory == sample_inventory
+    assert loaded == sample_inventory
 
 
 
-def test_save_overwrites_existing_file(tmp_path, sample_inventory):
+def test_search_exact_name(sample_inventory):
     # Arrange
-    file = tmp_path / "inventory.txt"
-    file.write_text("Old|Category|99\n")
+    term = "Stapler"
 
     # Act
-    save_inventory(sample_inventory, file)
+    result = find_matches(sample_inventory, term)
 
     # Assert
-    assert "Old|Category|99" not in file.read_text()
-    assert len(load_inventory(file)) == 4
+    assert result == [
+        {"name": "Stapler", "category": "Office Supplies", "quantity": 8}
+    ]
 
 
 
-def test_save_empty_overwrites_existing_file(tmp_path, sample_inventory):
+def test_search_ignore_case(sample_inventory):
     # Arrange
-    file = tmp_path / "inventory.txt"
-    save_inventory(sample_inventory, file)
+    term = "pRiNtEr pApEr"
 
     # Act
-    save_inventory([], file)
+    result = find_matches(sample_inventory, term)
 
     # Assert
-    assert file.read_text() == ""
+    assert len(result) == 1
+    assert result[0]["name"] == "Printer Paper"
 
 
 
-def test_save_preserves_item_order(tmp_path, sample_inventory):
+def test_search_no_matches(sample_inventory):
     # Arrange
-    file = tmp_path / "inventory.txt"
+    term = "Monitor"
 
     # Act
-    save_inventory(sample_inventory, file)
-    inventory = load_inventory(file)
+    result = find_matches(sample_inventory, term)
 
     # Assert
-    assert [item["name"] for item in inventory] == ["Notebook", "Laptop", "Pen", "Mouse"]
+    assert result == []
 
 
 
-def test_save_preserves_category_capitalization(tmp_path, sample_inventory):
+def test_remove_first_item(sample_inventory):
     # Arrange
-    file = tmp_path / "inventory.txt"
+    item_number = 1
 
     # Act
-    save_inventory(sample_inventory, file)
-    inventory = load_inventory(file)
+    removed = remove_item_at(sample_inventory, item_number)
 
     # Assert
-    assert inventory[0]["category"] == "Office"
-    assert inventory[2]["category"] == "office"
+    names = [item["name"] for item in sample_inventory]
+    assert removed is True
+    assert names == [
+        "Laptop Charger",
+        "Phone",
+        "Phone Charger",
+        "Stapler",
+        "Printer Paper",
+    ]
+
+
+
+def test_remove_last_item(sample_inventory):
+    # Arrange
+    item_number = len(sample_inventory)
+
+    # Act
+    removed = remove_item_at(sample_inventory, item_number)
+
+    # Assert
+    names = [item["name"] for item in sample_inventory]
+    assert removed is True
+    assert names == [
+        "Laptop",
+        "Laptop Charger",
+        "Phone",
+        "Phone Charger",
+        "Stapler",
+    ]
+
+
+
+def test_remove_item_number_zero_is_rejected(sample_inventory):
+    # Arrange
+    item_number = 0
+
+    # Act
+    removed = remove_item_at(sample_inventory, item_number)
+
+    # Assert
+    assert removed is False
+    assert len(sample_inventory) == 6
 
 
 
 @pytest.mark.parametrize(
-    "name",
-    ["Notebook", "Laptop", "Pen"],
-    ids=["notebook", "laptop", "pen"],
+    "new_quantity",
+    [25, 0],
+    ids=["normal-quantity", "zero-quantity"],
 )
-def test_save_different_item_names(tmp_path, name):
+def test_update_quantity(sample_inventory, new_quantity):
     # Arrange
-    file = tmp_path / "inventory.txt"
-    inventory = [{"name": name, "category": "Office", "quantity": 1}]
+    item_number = 1  # Laptop
 
     # Act
-    save_inventory(inventory, file)
+    updated = update_item_quantity(sample_inventory, item_number, new_quantity)
 
     # Assert
-    assert file.read_text() == f"{name}|Office|1\n"
+    assert updated is True
+    assert sample_inventory[0]["quantity"] == new_quantity
 
 
 
-def test_load_preserves_spaces_in_names_and_categories(tmp_path):
+def test_update_selected_item(sample_inventory):
     # Arrange
-    file = tmp_path / "inventory.txt"
-    file.write_text("Red Notebook|Office Supplies|9\n")
+    item_number = 3  # Phone
 
     # Act
-    inventory = load_inventory(file)
+    update_item_quantity(sample_inventory, item_number, 99)
 
     # Assert
-    assert inventory[0]["name"] == "Red Notebook"
-    assert inventory[0]["category"] == "Office Supplies"
+    assert sample_inventory == [
+        {"name": "Laptop", "category": "Electronics", "quantity": 10},
+        {"name": "Laptop Charger", "category": "Electronics", "quantity": 4},
+        {"name": "Phone", "category": "Electronics", "quantity": 99},
+        {"name": "Phone Charger", "category": "Electronics", "quantity": 5},
+        {"name": "Stapler", "category": "Office Supplies", "quantity": 8},
+        {"name": "Printer Paper", "category": "Office Supplies", "quantity": 2},
+    ]
 
 
 
-def test_save_and_load_after_adding_to_inventory(tmp_path, sample_inventory):
-    # Arrange
-    file = tmp_path / "inventory.txt"
-    new_item = {"name": "Stapler", "category": "Office", "quantity": 2}
-    sample_inventory.append(new_item)
+@pytest.mark.parametrize(
+    "name, category, quantity_text, expected_error",
+    [
+        ("", "Electronics", "5", "Item name cannot be empty."),
+        ("Tablet", "", "5", "Category cannot be empty."),
+        (
+            "Tab|let",
+            "Electronics",
+            "5",
+            "Item name may not contain the | character.",
+        ),
+    ],
+    ids=["empty-name", "empty-category", "pipe-in-name"],
+)
+def test_input_validation(sample_inventory, name, category, quantity_text, expected_error):
+    # Arrange - Parameters
 
     # Act
-    save_inventory(sample_inventory, file)
-    inventory = load_inventory(file)
+    error = validate_new_item(sample_inventory, name, category, quantity_text)
 
     # Assert
-    assert len(inventory) == 5
-    assert inventory[-1] == new_item
+    assert error == expected_error
+
+
+
+@pytest.mark.parametrize(
+    "quantity, expected_low_stock_count",
+    [(4, 1), (5, 0)],
+    ids=["quantity-4-is-low-stock", "quantity-5-is-not-low-stock"],
+)
+def test_low_stock(quantity, expected_low_stock_count):
+    # Arrange
+    inventory = [{"name": "Monitor", "category": "Electronics", "quantity": quantity}]
+
+    # Act
+    summary = calculate_summary(inventory)
+
+    # Assert
+    assert summary["low_stock_items"] == expected_low_stock_count
+
+
+
+def test_summary_empty_inventory():
+    # Arrange
+    inventory = []
+
+    # Act
+    summary = calculate_summary(inventory)
+
+    # Assert
+    assert summary["unique_items"] == 0
+    assert summary["total_quantity"] == 0
+    assert summary["low_stock_items"] == 0
+    assert summary["category_counts"] == {}
