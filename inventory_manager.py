@@ -4,7 +4,7 @@ Course: CPS 310
 Project: Inventory manager - Emulate the needs of a small company and their inventory management system.
 """
 INVENTORY_FILE = "inventory.txt"
-
+LOW_STOCK_THRESHOLD = 5
 
 def display_menu():
     """Displays menu options for user to choose from"""
@@ -230,6 +230,82 @@ def display_summary(inventory):
 
     for category, count in categories.items():
         print(f"{category.title()}: {count}")
+
+
+
+#Helper functions for testing
+def find_matches(inventory, search_term):
+    """Return every item whose name contains the search term (any case)."""
+    matches = []
+    for item in inventory:
+        if search_term.lower() in item["name"].lower():
+            matches.append(item)
+    return matches
+
+
+
+def remove_item_at(inventory, item_number):
+    """Remove the item at the 1-based item number. Return True if removed."""
+    if item_number < 1 or item_number > len(inventory):
+        return False
+    inventory.pop(item_number - 1)
+    return True
+
+
+
+def update_item_quantity(inventory, item_number, new_quantity):
+    """Set a new quantity for the 1-based item number. Return True if updated."""
+    if item_number < 1 or item_number > len(inventory):
+        return False
+    if new_quantity < 0:
+        return False
+    inventory[item_number - 1]["quantity"] = new_quantity
+    return True
+
+
+
+def validate_new_item(inventory, name, category, quantity_text):
+    """Return an error message if the new item is invalid, otherwise None."""
+    if not name:
+        return "Item name cannot be empty."
+    if "|" in name:
+        return "Item name may not contain the | character."
+    for item in inventory:
+        if item["name"].lower() == name.lower():
+            return "An item with that name already exists."
+    if not category:
+        return "Category cannot be empty."
+    if "|" in category:
+        return "Category may not contain the | character."
+    if not quantity_text.isdigit():
+        return "Quantity must be a nonnegative whole number."
+    return None
+
+
+
+def calculate_summary(inventory):
+    """Return a dictionary of summary values for the inventory."""
+    total_quantity = 0
+    low_stock_items = 0
+    category_counts = {}
+
+    for item in inventory:
+        total_quantity += item["quantity"]
+
+        if item["quantity"] < LOW_STOCK_THRESHOLD:
+            low_stock_items += 1
+
+        category_key = item["category"].lower()
+        if category_key not in category_counts:
+            category_counts[category_key] = 0
+        category_counts[category_key] += 1
+
+    return {
+        "unique_items": len(inventory),
+        "total_quantity": total_quantity,
+        "low_stock_items": low_stock_items,
+        "category_counts": category_counts,
+    }
 
 
 
